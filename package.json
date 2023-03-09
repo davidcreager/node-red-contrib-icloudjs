@@ -1,5 +1,5 @@
 {
-	"name": "icloudjs",
+	"name": "node-red-contrib-icloudjs",
 	"version": "1.0.0",
 	"description": "",
 	"main": "icloud_devices.js",
@@ -14,6 +14,6 @@
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
-		"icloudjs": "git+https://git@github.com/davidcreager/icloud.js.git",
+		"icloudjs": "git+https://git@github.com/davidcreager/icloud.js.git"
 	}
 }
