@@ -16,6 +16,7 @@ module.exports = function(RED) {
 		this.connected = false;
 		this.waiting = false;
         var node = this;
+		const encryptionKey = process.env.ENCRYPT_KEY || "Not Set";												 
 		node.status({fill: "blue", shape: "dot", text: "Ready "});
 		this.connect = async function ( user, password ) {
 			try {
@@ -27,7 +28,7 @@ module.exports = function(RED) {
 					//dataDirectory: path.resolve('./tmp/')
 					dataDirectory: path.resolve('/devices/icloudtrust/')
 				});
-				await this.icloud.authenticate()
+				await this.icloud.authenticate();
 				if (this.icloud.status === "MfaRequested") {
 					node.status({fill: "yellow", shape: "ring", text: "Awaiting 2FA Code " + getTime()});
 					this.waiting = true;

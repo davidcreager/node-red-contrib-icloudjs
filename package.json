@@ -14,6 +14,6 @@
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
-		"icloudjs": "^1.3.0"
+		"icloudjs": "git+https://git@github.com/davidcreager/icloud.js.git",
 	}
 }
