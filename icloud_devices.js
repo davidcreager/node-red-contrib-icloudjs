@@ -42,7 +42,7 @@ module.exports = function(RED) {
 				node.status({fill: "red", shape: "ring", text: debugMsg});
 				this.connected = false;
 				this.waiting = false;
-				return null;
+				return {errorMsg: debugMsg, errorCode: er};
 			}
 			node.status({fill: "green", shape: "dot", text: "Connected " });
 			return true;
@@ -64,7 +64,13 @@ module.exports = function(RED) {
 					return null;
 				}
 				const connectResult = await this.connect(msg.user, msg.password);
-				if (connectResult) node.send( { topic: "icloud_devices_connect", payload: Object.values(this.devices) } )
+				if (this.connected) {
+					node.send( { topic: "icloud_connected", payload: Object.values(this.devices) } )
+				} else if (this.waiting) {
+					node.send( { topic: "icloud_MfaRequested", payload: {errorMsg: "", errorCode: 0 } } );
+				} else {
+					node.send( { topic: "icloud_error", payload: {errorMsg: connectResult.errorMsg || "Unknown", errorCode: connectResult.errorCode || 999 } } );
+				}
 			} else if ( cmd == "Send2FA" ) {
 				if ( typeof(msg.payload) != "object"  || !msg.payload.hasOwnProperty("icloud_number")  || !this.waiting ) {
 					debugMsg = "[onInput][" + cmd + "]" + " msg.icloud_number to be set";
@@ -84,6 +90,7 @@ module.exports = function(RED) {
 					debugMsg = "[onInput][" + cmd + "]" + " caught error in provideMfaCode " + er;
 					node.error(["[node_icloudjs]" + debugMsg, msg ] );
 					node.status({fill: "red", shape: "ring", text: debugMsg});
+					node.send( { topic: "icloud_error", payload: {errorMsg: debugMsg, errorCode: er } } );
 					return null;
 				}
 			} else if ( cmd == "refreshDevices" || cmd == "listDevices" ) {
@@ -95,11 +102,16 @@ module.exports = function(RED) {
 						return null;
 					}
 					node.warn("[icloud_devices][" + cmd +"] Not connected - will attempt to connect")
-					const connectedResult = await this.connect(msg.user, msg.password);
-					if (!this.connected || !connectedResult) {
-						debugMsg = "[" + cmd + "]" + " Not connected";
+					const connectResult = await this.connect(msg.user, msg.password);
+					if (!this.connected)
+						debugMsg = "[" + cmd + "]" + " Not connected " + (connectResult.errorMsg || "");
 						node.error(["[node_icloudjs]" + debugMsg, msg ] );
 						node.status({fill: "red", shape: "ring", text: debugMsg});
+						if (this.waiting) {
+							node.send( { topic: "icloud_MfaRequested", payload: {errorMsg: "", errorCode: 0 } } );
+						} else {
+							node.send( { topic: "icloud_error", payload: {errorMsg: debugMsg, errorCode: connectResult.errorCode || 999 } } );
+						}
 						return null;
 					}
 				}
@@ -125,9 +137,10 @@ module.exports = function(RED) {
 					debugMsg = "[" + cmd + "]" + " status=" + this.icloud.status + " Error caught " + er;
 					node.error(["[node_icloudjs]" + debugMsg, msg ] );
 					node.status({fill: "red", shape: "ring", text: debugMsg});
-					return null
+					node.send( { topic: "icloud_error", payload: {errorMsg: debugMsg, errorCode: er } } );
+					return null;
 				}
-				node.send( { topic: "icloud_devices_connect", payload: this.devices } )
+				node.send( { topic: "icloud_devices_" + cmd, payload: this.devices } );
 				node.status({fill: "green", shape: "dot", text: cmd + " - returned " + this.devices.length + " devices"});
 			} else if ( cmd == "alert" ) {
 				if ( typeof(msg.payload) != "object"  || (!msg.payload.hasOwnProperty("deviceID") && !msg.payload.hasOwnProperty("deviceName") ) ){
@@ -146,10 +159,11 @@ module.exports = function(RED) {
 				try {
 					const findMyService = this.icloud.getService("findme");
 					await findMyService.alert( devID, (msg.payload.subject || undefined) );
-				} catch {
+				} catch(er) {
 					debugMsg = "[" + cmd + "]" + "Alerting Error caught " + er;
 					node.error(["[node_icloudjs]" + debugMsg, msg ] );
 					node.status({fill: "red", shape: "ring", text: debugMsg});
+					node.send( { topic: "icloud_error", payload: {errorMsg: debugMsg, errorCode: er } } );
 					return null
 				}
 			} else if ( cmd == "disconnect" ) {
@@ -161,6 +175,7 @@ module.exports = function(RED) {
 				}
 				this.connected = false;
 				this.icloud = null;
+				node.send( { topic: "icloud_disconnected", payload: {errorMsg: "", errorCode: 0 } } );
 				node.status({fill: "yellow", shape: "dot", text: "Closed"});
 			}
 
@@ -172,6 +187,7 @@ module.exports = function(RED) {
 			} else {
 					node.warn("[node_icloudjs][onClose]" + "icloud does not exist so no need to close")
 			}
+			node.send( { topic: "icloud_closed", payload: {errorMsg: "", errorCode: 0 } } );
 			done();
 		});
     }
