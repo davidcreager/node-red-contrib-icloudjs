@@ -103,7 +103,7 @@ module.exports = function(RED) {
 					}
 					node.warn("[icloud_devices][" + cmd +"] Not connected - will attempt to connect")
 					const connectResult = await this.connect(msg.user, msg.password);
-					if (!this.connected)
+					if (!this.connected) {
 						debugMsg = "[" + cmd + "]" + " Not connected " + (connectResult.errorMsg || "");
 						node.error(["[node_icloudjs]" + debugMsg, msg ] );
 						node.status({fill: "red", shape: "ring", text: debugMsg});
